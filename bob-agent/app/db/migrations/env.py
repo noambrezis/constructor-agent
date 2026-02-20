@@ -5,10 +5,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-# Populated in M2 when models are defined
-# from app.db.models import Base
-# target_metadata = Base.metadata
-target_metadata = None
+from app.db.database import Base
+import app.db.models  # noqa: F401 — ensure models are registered on Base.metadata
+
+target_metadata = Base.metadata
 
 config = context.config
 if config.config_file_name is not None:

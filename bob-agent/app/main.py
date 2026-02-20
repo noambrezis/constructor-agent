@@ -2,11 +2,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.db.database import init_db_engine
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # M3: await bridge.startup()
-    # M2: await init_db_engine()
+    await init_db_engine()
     # M6: app.state.redis = await aioredis.from_url(settings.REDIS_URL)
     # M7: app.state.arq_pool = await create_pool(...)
     yield
