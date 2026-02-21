@@ -18,6 +18,7 @@ from app.config import settings
 from app.models.webhook import MessageBody
 from app.services.bridge_service import bridge
 from app.services.site_cache import site_cache
+from app.services import soniox_service
 
 logger = structlog.get_logger()
 
@@ -68,6 +69,21 @@ async def preprocess_node(state: AgentState) -> dict:
         "tool_was_called": False,
         "iteration_count": 0,
     }
+
+
+async def transcribe_node(state: AgentState) -> dict:
+    """Call Soniox STT for audio messages; store result in state["transcript"]."""
+    file_id = state.get("sonioxFileId")
+    if not file_id:
+        return {}
+    site_context = state.get("site", {}).get("context", {})
+    try:
+        text = await soniox_service.transcribe(file_id, site_context)
+        logger.info("transcription_complete", group_id=state.get("group_id"), length=len(text))
+    except (TimeoutError, RuntimeError) as exc:
+        logger.error("transcription_failed", group_id=state.get("group_id"), error=str(exc))
+        text = ""
+    return {"transcript": text}
 
 
 async def build_input_node(state: AgentState) -> dict:
@@ -152,10 +168,14 @@ def route_after_agent(state: AgentState) -> str:
 
 
 def route_preprocess(state: AgentState) -> str:
-    """Skip the rest of the graph if the site is unknown."""
+    """Skip the rest of the graph if the site is unknown.
+    Route audio messages through transcription before building input.
+    """
     if not state.get("site"):
         logger.warning("unknown_site", group_id=state.get("group_id"))
         return END
+    if state.get("sonioxFileId"):
+        return "transcribe"
     return "build_input"
 
 
@@ -168,6 +188,7 @@ def build_graph(checkpointer=None):
     builder = StateGraph(AgentState)
 
     builder.add_node("preprocess", preprocess_node)
+    builder.add_node("transcribe", transcribe_node)
     builder.add_node("build_input", build_input_node)
     builder.add_node("agent", agent_node)
     builder.add_node("tools", tool_node)
@@ -175,7 +196,12 @@ def build_graph(checkpointer=None):
     builder.add_node("send_reply", send_reply_node)
 
     builder.set_entry_point("preprocess")
-    builder.add_conditional_edges("preprocess", route_preprocess, {"build_input": "build_input", END: END})
+    builder.add_conditional_edges(
+        "preprocess",
+        route_preprocess,
+        {"transcribe": "transcribe", "build_input": "build_input", END: END},
+    )
+    builder.add_edge("transcribe", "build_input")
     builder.add_edge("build_input", "agent")
     builder.add_conditional_edges(
         "agent",
@@ -215,6 +241,7 @@ async def run_agent(body: MessageBody) -> None:
         "tool_was_called": False,
         "iteration_count": 0,
         "transcript": None,
+        "sonioxFileId": body.sonioxFileId,
         "image_url": body.mediaUrl if body.mediaType == "image" else None,
         "video_url": body.mediaUrl if body.mediaType == "video" else None,
         "is_reaction": body.type == "reaction",

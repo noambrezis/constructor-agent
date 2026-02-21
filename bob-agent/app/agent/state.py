@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     transcript: Optional[str]
     image_url: Optional[str]
     video_url: Optional[str]
+    sonioxFileId: Optional[str]   # Pre-uploaded Soniox file ID (audio messages)
 
     # Reaction handling
     is_reaction: bool
