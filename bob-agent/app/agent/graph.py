@@ -130,6 +130,19 @@ async def agent_node(state: AgentState) -> dict:
     system_prompt = build_system_prompt(state["site"])
     messages_for_llm = [SystemMessage(content=system_prompt)] + list(state["messages"])
 
+    # Diagnostic: log what the LLM actually receives
+    human_msgs = [m for m in messages_for_llm if hasattr(m, "content") and m.__class__.__name__ == "HumanMessage"]
+    tool_names = [t.name for t in TOOLS]
+    logger.info(
+        "agent_node_input",
+        group_id=state.get("group_id"),
+        model=settings.OPENAI_MODEL,
+        human_message_preview=(human_msgs[-1].content if human_msgs else "")[:120],
+        tool_names=tool_names,
+        n_messages_to_llm=len(messages_for_llm),
+        system_prompt_chars=len(system_prompt),
+    )
+
     response = await llm_with_tools.ainvoke(messages_for_llm)
     tool_called = bool(getattr(response, "tool_calls", None))
     logger.info(
