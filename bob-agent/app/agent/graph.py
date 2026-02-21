@@ -132,6 +132,15 @@ async def agent_node(state: AgentState) -> dict:
 
     response = await llm_with_tools.ainvoke(messages_for_llm)
     tool_called = bool(getattr(response, "tool_calls", None))
+    logger.info(
+        "agent_node_decision",
+        group_id=state.get("group_id"),
+        iteration=state.get("iteration_count", 0),
+        tool_called=tool_called,
+        tool_calls=[tc["name"] for tc in (getattr(response, "tool_calls", None) or [])],
+        reply_preview=(response.content or "")[:80] if not tool_called else "",
+        n_history_msgs=len(state.get("messages", [])),
+    )
     return {
         "messages": [response],
         "tool_was_called": tool_called,
