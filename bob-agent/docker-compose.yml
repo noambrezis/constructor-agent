@@ -23,7 +23,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: python -m arq app.tasks.worker.WorkerSettings
+    command: arq app.worker.WorkerSettings
 
   db:
     image: postgres:16
