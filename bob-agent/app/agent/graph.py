@@ -99,14 +99,12 @@ async def build_input_node(state: AgentState) -> dict:
         body_parts["originalMessage"] = state["original_message_text"]
 
     chat_input = json.dumps(body_parts, ensure_ascii=False)
-    system_prompt = build_system_prompt(state["site"])
 
+    # Only add the HumanMessage here — SystemMessage is injected fresh in agent_node
+    # so it never accumulates as duplicates in the conversation history.
     return {
         "chat_input": chat_input,
-        "messages": [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=chat_input),
-        ],
+        "messages": [HumanMessage(content=chat_input)],
     }
 
 
@@ -118,7 +116,13 @@ async def agent_node(state: AgentState) -> dict:
         api_key=settings.OPENAI_API_KEY,
     )
     llm_with_tools = llm.bind_tools(TOOLS)
-    response = await llm_with_tools.ainvoke(state["messages"])
+
+    # Prepend a fresh SystemMessage so the prompt is always current and never
+    # duplicated in the stored conversation history.
+    system_prompt = build_system_prompt(state["site"])
+    messages_for_llm = [SystemMessage(content=system_prompt)] + list(state["messages"])
+
+    response = await llm_with_tools.ainvoke(messages_for_llm)
     tool_called = bool(getattr(response, "tool_calls", None))
     return {
         "messages": [response],
