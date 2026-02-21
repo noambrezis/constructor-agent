@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from sqlalchemy import text
@@ -56,6 +57,15 @@ async def init_db_engine(url: str | None = None) -> None:
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an AsyncSession."""
+    if _session_factory is None:
+        raise RuntimeError("Database engine is not initialised. Call init_db_engine() first.")
+    async with _session_factory() as session:
+        yield session
+
+
+@asynccontextmanager
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Async context manager for use in tools and background tasks (not FastAPI deps)."""
     if _session_factory is None:
         raise RuntimeError("Database engine is not initialised. Call init_db_engine() first.")
     async with _session_factory() as session:
