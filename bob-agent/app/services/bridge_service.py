@@ -36,8 +36,10 @@ class BridgeClient:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=4), reraise=True)
     async def send_messages(self, group_id: str, messages: list[str]) -> None:
+        # Bridge /send-messages expects objects with a consolidated_info field
         resp = await self.client.post(
-            "/send-messages", json={"groupId": group_id, "messages": messages}
+            "/send-messages",
+            json={"groupId": group_id, "messages": [{"consolidated_info": m} for m in messages]},
         )
         resp.raise_for_status()
 
