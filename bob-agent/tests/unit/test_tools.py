@@ -5,24 +5,26 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.site_cache import CachedSite
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_site(id=1, group_id="G1", name="Test Site"):
-    site = MagicMock()
-    site.id = id
-    site.group_id = group_id
-    site.name = name
-    site.logo_url = ""
-    site.context = {
-        "suppliers": ["ספק א", "ספק ב"],
-        "locations": ["קומה 1", "קומה 2"],
-    }
-    site.training_phase = "Active"
-    return site
+def _make_cached_site(id=1, group_id="G1", name="Test Site"):
+    return CachedSite(
+        id=id,
+        group_id=group_id,
+        name=name,
+        logo_url="",
+        training_phase="Active",
+        context={
+            "suppliers": ["ספק א", "ספק ב"],
+            "locations": ["קומה 1", "קומה 2"],
+        },
+    )
 
 
 def _make_defect(defect_id=1, description="crack", supplier="ספק א", location="קומה 1", status="פתוח"):
@@ -69,11 +71,11 @@ async def test_add_defect_site_not_found():
 
     with (
         patch("app.agent.tools.add_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.add_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.add_defect.site_cache") as mock_cache,
         patch("app.agent.tools.add_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.add_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         result = await add_defect.coroutine(
             description="crack",
@@ -90,17 +92,17 @@ async def test_add_defect_site_not_found():
 async def test_add_defect_success():
     from app.agent.tools.add_defect import add_defect
 
-    site = _make_site()
+    site = _make_cached_site()
     defect = _make_defect(defect_id=3)
     session = _mock_session()
 
     with (
         patch("app.agent.tools.add_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.add_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.add_defect.site_cache") as mock_cache,
         patch("app.agent.tools.add_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.add_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.get_next_defect_id = AsyncMock(return_value=3)
         mock_defect_repo.create = AsyncMock(return_value=defect)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=[defect])
@@ -125,17 +127,17 @@ async def test_add_defect_success():
 async def test_add_defect_calls_create_with_correct_fields():
     from app.agent.tools.add_defect import add_defect
 
-    site = _make_site(id=7)
+    site = _make_cached_site(id=7)
     defect = _make_defect(defect_id=1)
     session = _mock_session()
 
     with (
         patch("app.agent.tools.add_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.add_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.add_defect.site_cache") as mock_cache,
         patch("app.agent.tools.add_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.add_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.get_next_defect_id = AsyncMock(return_value=1)
         mock_defect_repo.create = AsyncMock(return_value=defect)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=[defect])
@@ -172,11 +174,11 @@ async def test_update_defect_site_not_found():
 
     with (
         patch("app.agent.tools.update_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.update_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.update_defect.site_cache") as mock_cache,
         patch("app.agent.tools.update_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.update_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         result = await update_defect.coroutine(defect_id=1, group_id="G1")
 
@@ -189,16 +191,16 @@ async def test_update_defect_site_not_found():
 async def test_update_defect_not_found():
     from app.agent.tools.update_defect import update_defect
 
-    site = _make_site()
+    site = _make_cached_site()
     session = _mock_session()
 
     with (
         patch("app.agent.tools.update_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.update_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.update_defect.site_cache") as mock_cache,
         patch("app.agent.tools.update_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.update_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.update = AsyncMock(return_value=None)
 
         result = await update_defect.coroutine(defect_id=99, group_id="G1")
@@ -212,17 +214,17 @@ async def test_update_defect_not_found():
 async def test_update_defect_success():
     from app.agent.tools.update_defect import update_defect
 
-    site = _make_site()
+    site = _make_cached_site()
     updated = _make_defect(defect_id=2, status="בעבודה")
     session = _mock_session()
 
     with (
         patch("app.agent.tools.update_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.update_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.update_defect.site_cache") as mock_cache,
         patch("app.agent.tools.update_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.update_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.update = AsyncMock(return_value=updated)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=[updated])
         mock_bridge.send_message = AsyncMock()
@@ -237,17 +239,17 @@ async def test_update_defect_success():
 async def test_update_defect_only_updates_provided_fields():
     from app.agent.tools.update_defect import update_defect
 
-    site = _make_site()
+    site = _make_cached_site()
     updated = _make_defect(defect_id=1)
     session = _mock_session()
 
     with (
         patch("app.agent.tools.update_defect.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.update_defect.site_repo") as mock_site_repo,
+        patch("app.agent.tools.update_defect.site_cache") as mock_cache,
         patch("app.agent.tools.update_defect.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.update_defect.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.update = AsyncMock(return_value=updated)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=[updated])
         mock_bridge.send_message = AsyncMock()
@@ -271,16 +273,16 @@ async def test_update_defect_only_updates_provided_fields():
 async def test_send_whatsapp_report_no_match():
     from app.agent.tools.send_report import send_whatsapp_report
 
-    site = _make_site()
+    site = _make_cached_site()
     session = _mock_session()
 
     with (
         patch("app.agent.tools.send_report.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.send_report.site_repo") as mock_site_repo,
+        patch("app.agent.tools.send_report.site_cache") as mock_cache,
         patch("app.agent.tools.send_report.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.send_report.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=[])
         mock_bridge.send_message = AsyncMock()
         mock_bridge.send_messages = AsyncMock()
@@ -296,17 +298,17 @@ async def test_send_whatsapp_report_no_match():
 async def test_send_whatsapp_report_sends_filtered_results():
     from app.agent.tools.send_report import send_whatsapp_report
 
-    site = _make_site()
+    site = _make_cached_site()
     defects = [_make_defect(defect_id=i, status="פתוח") for i in range(1, 4)]
     session = _mock_session()
 
     with (
         patch("app.agent.tools.send_report.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.send_report.site_repo") as mock_site_repo,
+        patch("app.agent.tools.send_report.site_cache") as mock_cache,
         patch("app.agent.tools.send_report.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.send_report.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=defects)
         mock_bridge.send_message = AsyncMock()
         mock_bridge.send_messages = AsyncMock()
@@ -325,10 +327,10 @@ async def test_send_whatsapp_report_site_not_found():
 
     with (
         patch("app.agent.tools.send_report.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.send_report.site_repo") as mock_site_repo,
+        patch("app.agent.tools.send_report.site_cache") as mock_cache,
         patch("app.agent.tools.send_report.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         result = await send_whatsapp_report.coroutine(group_id="G1")
 
@@ -341,17 +343,17 @@ async def test_send_whatsapp_report_batches_large_lists():
     """More than 20 defects should be split into multiple batches."""
     from app.agent.tools.send_report import send_whatsapp_report
 
-    site = _make_site()
+    site = _make_cached_site()
     defects = [_make_defect(defect_id=i) for i in range(1, 45)]  # 44 defects → 3 batches
     session = _mock_session()
 
     with (
         patch("app.agent.tools.send_report.get_db_session", _db_ctx(session)),
-        patch("app.agent.tools.send_report.site_repo") as mock_site_repo,
+        patch("app.agent.tools.send_report.site_cache") as mock_cache,
         patch("app.agent.tools.send_report.defect_repo") as mock_defect_repo,
         patch("app.agent.tools.send_report.bridge") as mock_bridge,
     ):
-        mock_site_repo.get_by_group_id = AsyncMock(return_value=site)
+        mock_cache.get = AsyncMock(return_value=site)
         mock_defect_repo.get_all_for_site = AsyncMock(return_value=defects)
         mock_bridge.send_messages = AsyncMock()
 
@@ -403,8 +405,10 @@ async def test_update_logo_success():
     with (
         patch("app.agent.tools.events.get_db_session", _db_ctx(session)),
         patch("app.agent.tools.events.site_repo") as mock_site_repo,
+        patch("app.agent.tools.events.site_cache") as mock_cache,
     ):
         mock_site_repo.update = AsyncMock(return_value=updated_site)
+        mock_cache.invalidate = AsyncMock()
 
         result = await update_logo.coroutine(
             image_url="https://example.com/logo.png",
@@ -415,6 +419,7 @@ async def test_update_logo_success():
     mock_site_repo.update.assert_called_once_with(
         session, "G1", logo_url="https://example.com/logo.png"
     )
+    mock_cache.invalidate.assert_called_once_with("G1")
 
 
 @pytest.mark.asyncio
@@ -426,8 +431,10 @@ async def test_update_logo_site_not_found():
     with (
         patch("app.agent.tools.events.get_db_session", _db_ctx(session)),
         patch("app.agent.tools.events.site_repo") as mock_site_repo,
+        patch("app.agent.tools.events.site_cache") as mock_cache,
     ):
         mock_site_repo.update = AsyncMock(return_value=None)
+        mock_cache.invalidate = AsyncMock()
 
         result = await update_logo.coroutine(
             image_url="https://example.com/logo.png",
@@ -435,3 +442,4 @@ async def test_update_logo_site_not_found():
         )
 
     assert "Error" in result
+    mock_cache.invalidate.assert_not_called()

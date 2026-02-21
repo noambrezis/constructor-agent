@@ -6,6 +6,7 @@ from langgraph.prebuilt import InjectedState
 from app.db.database import get_db_session
 from app.db.repositories import site_repo
 from app.services.bridge_service import bridge
+from app.services.site_cache import site_cache
 
 
 @tool
@@ -39,4 +40,5 @@ async def update_logo(
             updated = await site_repo.update(session, group_id, logo_url=image_url)
     if updated is None:
         return "Error: site not found."
+    await site_cache.invalidate(group_id)
     return "Logo updated."

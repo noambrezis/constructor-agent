@@ -4,9 +4,10 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from app.db.database import get_db_session
-from app.db.repositories import defect_repo, site_repo
+from app.db.repositories import defect_repo
 from app.services.bridge_service import bridge
-from app.utils.formatting import format_defect_row, filter_defects
+from app.services.site_cache import site_cache
+from app.utils.formatting import format_defect_row
 
 
 @tool
@@ -19,12 +20,12 @@ async def add_defect(
     sender: Annotated[str, InjectedState("sender")] = "",
 ) -> str:
     """Log a new site defect record."""
+    site = await site_cache.get(group_id)
+    if site is None:
+        return "Error: site not found for this group."
+
     async with get_db_session() as session:
         async with session.begin():
-            site = await site_repo.get_by_group_id(session, group_id)
-            if site is None:
-                return "Error: site not found for this group."
-
             next_id = await defect_repo.get_next_defect_id(session, site.id)
             defect = await defect_repo.create(
                 session,
@@ -43,7 +44,6 @@ async def add_defect(
 
     # Show the updated defect list
     async with get_db_session() as session:
-        site = await site_repo.get_by_group_id(session, group_id)
         all_defects = await defect_repo.get_all_for_site(session, site.id)
 
     lines = [format_defect_row(d) for d in all_defects]

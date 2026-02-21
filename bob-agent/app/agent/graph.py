@@ -15,10 +15,9 @@ from app.agent.tools.events import add_event, update_logo
 from app.agent.tools.send_report import send_pdf_report, send_whatsapp_report
 from app.agent.tools.update_defect import update_defect
 from app.config import settings
-from app.db.database import get_db_session
-from app.db.repositories import site_repo
 from app.models.webhook import MessageBody
 from app.services.bridge_service import bridge
+from app.services.site_cache import site_cache
 
 logger = structlog.get_logger()
 
@@ -36,8 +35,7 @@ tool_node = ToolNode(TOOLS)
 
 async def preprocess_node(state: AgentState) -> dict:
     """Validate the site exists, set reaction flags, load site context."""
-    async with get_db_session() as session:
-        site_obj = await site_repo.get_by_group_id(session, state["group_id"])
+    site_obj = await site_cache.get(state["group_id"])
 
     if site_obj is None:
         # Unknown site — return minimal state so the graph can exit gracefully
@@ -46,10 +44,10 @@ async def preprocess_node(state: AgentState) -> dict:
     # Build site dict (serialisable — no ORM objects in state)
     site = {
         "id": site_obj.id,
-        "name": site_obj.name or "",
-        "logo_url": site_obj.logo_url or "",
+        "name": site_obj.name,
+        "logo_url": site_obj.logo_url,
         "training_phase": site_obj.training_phase,
-        "context": site_obj.context or {},
+        "context": site_obj.context,
     }
 
     messages = state.get("messages", [])

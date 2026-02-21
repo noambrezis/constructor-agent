@@ -4,8 +4,9 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from app.db.database import get_db_session
-from app.db.repositories import defect_repo, site_repo
+from app.db.repositories import defect_repo
 from app.services.bridge_service import bridge
+from app.services.site_cache import site_cache
 from app.utils.formatting import filter_defects, format_defect_row
 
 
@@ -18,10 +19,11 @@ async def send_whatsapp_report(
     group_id: Annotated[str, InjectedState("group_id")] = "",
 ) -> str:
     """Send a filtered defect list as WhatsApp messages."""
+    site = await site_cache.get(group_id)
+    if site is None:
+        return "Error: site not found."
+
     async with get_db_session() as session:
-        site = await site_repo.get_by_group_id(session, group_id)
-        if site is None:
-            return "Error: site not found."
         all_defects = await defect_repo.get_all_for_site(session, site.id)
 
     filtered = filter_defects(

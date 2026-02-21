@@ -12,6 +12,7 @@ from app.middleware.auth import verify_webhook_secret
 from app.middleware.rate_limit import check_rate_limit
 from app.models.webhook import WebhookPayload
 from app.services.bridge_service import bridge
+from app.services.site_cache import site_cache
 
 logger = structlog.get_logger()
 
@@ -21,10 +22,12 @@ async def lifespan(app: FastAPI):
     await bridge.startup()
     await init_db_engine()
     app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    await site_cache.startup(settings.REDIS_URL)
     # M7: app.state.arq_pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
     logger.info("bob_agent_started")
     yield
     await bridge.shutdown()
+    await site_cache.shutdown()
     await app.state.redis.aclose()
     # M7: await app.state.arq_pool.close()
     logger.info("bob_agent_stopped")

@@ -4,8 +4,9 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from app.db.database import get_db_session
-from app.db.repositories import defect_repo, site_repo
+from app.db.repositories import defect_repo
 from app.services.bridge_service import bridge
+from app.services.site_cache import site_cache
 from app.utils.formatting import filter_defects, format_defect_row
 
 
@@ -20,24 +21,24 @@ async def update_defect(
     group_id: Annotated[str, InjectedState("group_id")] = "",
 ) -> str:
     """Update one or more fields of an existing defect."""
+    site = await site_cache.get(group_id)
+    if site is None:
+        return "Error: site not found for this group."
+
+    kwargs: dict = {}
+    if description:
+        kwargs["description"] = description
+    if supplier:
+        kwargs["supplier"] = supplier
+    if location:
+        kwargs["location"] = location
+    if image:
+        kwargs["image_url"] = image
+    if status:
+        kwargs["status"] = status
+
     async with get_db_session() as session:
         async with session.begin():
-            site = await site_repo.get_by_group_id(session, group_id)
-            if site is None:
-                return "Error: site not found for this group."
-
-            kwargs: dict = {}
-            if description:
-                kwargs["description"] = description
-            if supplier:
-                kwargs["supplier"] = supplier
-            if location:
-                kwargs["location"] = location
-            if image:
-                kwargs["image_url"] = image
-            if status:
-                kwargs["status"] = status
-
             updated = await defect_repo.update(session, site.id, defect_id, **kwargs)
 
     if updated is None:
@@ -47,7 +48,6 @@ async def update_defect(
 
     # Show the updated defect
     async with get_db_session() as session:
-        site = await site_repo.get_by_group_id(session, group_id)
         all_defects = await defect_repo.get_all_for_site(session, site.id)
 
     filtered = filter_defects(all_defects, defect_id_filter=str(defect_id))
