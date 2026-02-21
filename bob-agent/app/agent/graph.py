@@ -87,18 +87,26 @@ async def transcribe_node(state: AgentState) -> dict:
 
 
 async def build_input_node(state: AgentState) -> dict:
-    """Construct the chat_input JSON string from message context."""
-    body_parts: dict = {
-        "message": state.get("messageText") or state.get("transcript") or "",  # type: ignore
-    }
+    """Construct the chat input from message context."""
+    text: str = state.get("messageText") or state.get("transcript") or ""  # type: ignore
 
-    if state.get("image_url"):
-        body_parts["image"] = state["image_url"]
-    if state.get("is_reaction") and state.get("original_message_text"):
-        body_parts["reaction"] = state.get("emoji", "")
-        body_parts["originalMessage"] = state["original_message_text"]
+    has_extras = bool(
+        state.get("image_url")
+        or (state.get("is_reaction") and state.get("original_message_text"))
+    )
 
-    chat_input = json.dumps(body_parts, ensure_ascii=False)
+    if has_extras:
+        # Rich message — encode as JSON so the LLM gets all fields clearly.
+        body_parts: dict = {"message": text}
+        if state.get("image_url"):
+            body_parts["image"] = state["image_url"]
+        if state.get("is_reaction") and state.get("original_message_text"):
+            body_parts["reaction"] = state.get("emoji", "")
+            body_parts["originalMessage"] = state["original_message_text"]
+        chat_input = json.dumps(body_parts, ensure_ascii=False)
+    else:
+        # Plain text — send as-is so the LLM recognises it naturally.
+        chat_input = text
 
     # Only add the HumanMessage here — SystemMessage is injected fresh in agent_node
     # so it never accumulates as duplicates in the conversation history.
