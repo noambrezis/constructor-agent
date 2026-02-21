@@ -7,6 +7,7 @@ from arq.connections import RedisSettings
 from fastapi import Depends, FastAPI, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.router import router as admin_router
 from app.config import settings
 from app.db.database import get_session, init_db_engine
 from app.db.repositories import dedup_repo
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Bob Agent", lifespan=lifespan)
+app.include_router(admin_router)
 
 
 @app.get("/health")
