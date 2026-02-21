@@ -3,9 +3,8 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# start.sh runs `alembic upgrade head` then launches uvicorn on $PORT.
+# start.sh branches on START_MODE: "worker" → arq, default → alembic + uvicorn.
+# healthcheckPath is set per-service via Railway API (agent only — worker has none).
 startCommand = "bash start.sh"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
