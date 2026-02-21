@@ -1,6 +1,6 @@
 """Unit tests for app/services/pdf_service.py."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -173,8 +173,6 @@ async def test_generate_raises_on_submit_http_error():
 @pytest.mark.asyncio
 async def test_send_pdf_report_calls_service_and_bridge():
     """Happy path: fetches defects, calls pdf_service.generate, sends document."""
-    from unittest.mock import AsyncMock, MagicMock, patch
-
     from app.agent.tools.send_report import send_pdf_report
     from app.services.site_cache import CachedSite
 
@@ -271,6 +269,3 @@ async def test_send_pdf_report_pdf_error_returns_message():
     mock_gen.assert_called_once()
     mock_doc.assert_not_called()
     assert "שגיאה" in result
-
-
-from unittest.mock import MagicMock

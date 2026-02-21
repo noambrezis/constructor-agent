@@ -12,4 +12,6 @@ EXPOSE 8000
 
 STOPSIGNAL SIGTERM
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so ${PORT} is expanded at runtime (Railway sets $PORT dynamically).
+# start.sh runs `alembic upgrade head` before launching uvicorn.
+CMD ["bash", "start.sh"]

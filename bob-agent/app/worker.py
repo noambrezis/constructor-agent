@@ -30,7 +30,11 @@ async def process_message(ctx: dict, body: dict) -> None:
     message = MessageBody(**body)
     log = logger.bind(group_id=message.groupId, message_id=message.messageId)
     log.info("worker_processing_message")
-    await run_agent(message)
+    try:
+        await run_agent(message)
+    except Exception as exc:
+        log.error("worker_task_failed", error=str(exc))
+        raise  # re-raise so ARQ records the failure and applies retry policy
     log.info("worker_done")
 
 

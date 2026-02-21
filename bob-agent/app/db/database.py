@@ -29,8 +29,22 @@ def _clean_pg_url(url: str) -> tuple[str, dict]:
     return clean, connect_args
 
 
+def _normalise_pg_url(url: str) -> str:
+    """Rewrite legacy postgres:// / postgresql:// schemes to postgresql+asyncpg://.
+
+    Railway and Neon often supply postgres:// (the legacy libpq form).
+    asyncpg requires the explicit driver suffix.
+    """
+    if url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + url[len("postgresql://"):]
+    return url
+
+
 def _make_engine(url: str) -> AsyncEngine:
     """Create an async engine. PostgreSQL gets pool tuning; SQLite gets bare engine."""
+    url = _normalise_pg_url(url)
     if url.startswith("postgresql"):
         clean_url, connect_args = _clean_pg_url(url)
         return create_async_engine(

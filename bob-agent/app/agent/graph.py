@@ -267,3 +267,9 @@ async def run_agent(body: MessageBody) -> None:
     except Exception as exc:
         log.error("agent_error", error=str(exc))
         raise
+    finally:
+        # Always confirm so the Bridge releases its queue slot, even on error.
+        try:
+            await bridge.confirm_processing(body.messageId)
+        except Exception as exc:
+            log.warning("confirm_processing_failed", error=str(exc))
