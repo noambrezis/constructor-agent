@@ -11,7 +11,7 @@ class MessageBody(BaseModel):
     sender: str                               # WhatsApp JID of sender
     reactor: str | None = None               # JID of person who reacted (reactions only)
     messageText: str | None = None
-    type: str                                 # "message" | "reaction"
+    type: str = "message"                     # "message" | "reaction"
     emoji: str | None = None                 # e.g. "👍"
     mediaUrl: str | None = None
     mediaType: str | None = None             # "image" | "video" | "audio"
