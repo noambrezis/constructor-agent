@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 import structlog
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import Depends, FastAPI, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,13 +25,13 @@ async def lifespan(app: FastAPI):
     await init_db_engine()
     app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     await site_cache.startup(settings.REDIS_URL)
-    # M7: app.state.arq_pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+    app.state.arq_pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
     logger.info("bob_agent_started")
     yield
     await bridge.shutdown()
     await site_cache.shutdown()
+    await app.state.arq_pool.close()
     await app.state.redis.aclose()
-    # M7: await app.state.arq_pool.close()
     logger.info("bob_agent_stopped")
 
 
@@ -66,12 +68,8 @@ async def handle_message(
     await dedup_repo.mark_as_processed(session, body.messageId, body.groupId)
     await session.commit()
 
-    # 5. Enqueue durable task (M7: ARQ worker)
-    arq_pool = getattr(request.app.state, "arq_pool", None)
-    if arq_pool is not None:
-        await arq_pool.enqueue_job("process_message", body.model_dump())
-    else:
-        log.warning("arq_pool_not_ready", note="message accepted but not queued — M7 pending")
+    # 5. Enqueue durable task to ARQ worker
+    await request.app.state.arq_pool.enqueue_job("process_message", body.model_dump())
 
     log.info("message_accepted")
     return {"status": "accepted"}

@@ -7,6 +7,8 @@ Uses:
 - MockTransport for the Bridge HTTP client
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
 import pytest_asyncio
 import httpx
@@ -63,6 +65,11 @@ async def setup_app_state():
         base_url="https://bridge.test",
         transport=httpx.MockTransport(lambda r: httpx.Response(200)),
     )
+
+    # 5. Mock ARQ pool so enqueue_job doesn't need a real Redis connection
+    mock_arq_pool = AsyncMock()
+    mock_arq_pool.enqueue_job = AsyncMock()
+    app.state.arq_pool = mock_arq_pool
 
     yield
 
