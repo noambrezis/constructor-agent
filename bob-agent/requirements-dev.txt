@@ -13,3 +13,7 @@ pytest-cov==5.0.0
 
 # HTTP test client (must match requirements.txt)
 httpx==0.28.1
+
+# Redis mock for unit tests
+fakeredis==2.34.0
+aiosqlite==0.22.1
