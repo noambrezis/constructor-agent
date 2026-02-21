@@ -30,3 +30,7 @@ class AgentState(TypedDict):
     is_reaction: bool
     is_close_reaction: bool
     original_message_text: Optional[str]
+
+    # Raw webhook fields — needed by build_input_node / preprocess_node
+    messageText: Optional[str]
+    emoji: Optional[str]
